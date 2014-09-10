@@ -1,4 +1,4 @@
-/* package error provides utilities for creating and reporting errors.
+/*package error provides utilities for creating and reporting errors.
 
 Currently supported ErrorCodes are
 
@@ -44,7 +44,8 @@ outside its valid value range. All of a package's externally visible
 functions must give value errors when encountering such a value. Internal
 package functions may return these errors at the programmer's discretion. If
 input is in the form of labeled integers (like ErrorCodes) and there is no
-other potentially erroneous input, value errors don't need to be returned.*/
+other potentially erroneous input, value errors don't need to be returned.
+*/
 package error
 
 import (
