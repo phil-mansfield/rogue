@@ -1,4 +1,4 @@
 rogue
 =====
 
-Unnamed roguelike written in Go.
+An unnamed roguelike written in Go.
