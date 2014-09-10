@@ -1,0 +1,3 @@
+FavoriteQuote = Do not destroy what you cannot create.
+FavoriteCat = Ned
+FavoriteNumber = 3

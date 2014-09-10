@@ -1,0 +1,1 @@
+FavoriteQuote = Do not destroy what you cannot create.

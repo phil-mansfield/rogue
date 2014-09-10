@@ -1,0 +1,2 @@
+FavoriteQuote = Do not destroy what you cannot create.
+FavoriteNumber = 3
