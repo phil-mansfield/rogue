@@ -1,6 +1,12 @@
 package item
 
-// type BufferIndex is an integer type used to index into ListBuffer.
+import (
+	"math"
+
+	"github.com/phil-mansfield/rogue/error"
+)
+
+// Type BufferIndex is an integer type used to index into ListBuffer.
 //
 // PROGRAMMER NOTE: Since BufferIndex may be changed to different size or
 // to a type of unknown signage, all index literals must be constructed from 
@@ -13,16 +19,16 @@ const (
 	defaultBufferLength = 1 << 8 // The length of an empty ListBuffer.
 )
 
-// type Node is a wrapper around the type Item which allows it to be an element
+// Type Node is a wrapper around the type Item which allows it to be an element
 // in a linked list.
 type Node struct {
 	Item Item
-	Next, Prev NodeIndex
+	Next, Prev BufferIndex
 }
 
-// type ListBuffer is a data structure which represents numerous lists of Items.
+// Type ListBuffer is a data structure which represents numerous lists of Items.
 type ListBuffer struct {
-	FreeHead NodeIndex
+	FreeHead BufferIndex
 	Buffer []Node
 	Count BufferIndex
 }
@@ -31,6 +37,7 @@ type ListBuffer struct {
 func New() *ListBuffer {
 	buf := new(ListBuffer)
 	buf.Init()
+	return buf
 }
 
 // Init initializes a blank ListBuffer instance.
@@ -41,12 +48,12 @@ func (buf *ListBuffer) Init() {
 
 	for i := 0; i < len(buf.Buffer); i++ {
 		buf.Buffer[i].Item.Clear()
-		buf.Buffer[i].Prev = i - 1
-		buf.Buffer[i].Next = i + 1
+		buf.Buffer[i].Prev = BufferIndex(i - 1)
+		buf.Buffer[i].Next = BufferIndex(i + 1)
 	}
 
-	buf.Buffer[0] = NilIndex
-	buf.Buffer[len(buf.Buffer) - 1] = NilIndex
+	buf.Buffer[0].Prev = NilIndex
+	buf.Buffer[len(buf.Buffer) - 1].Next = NilIndex
 }
 
 // Singleton creates a singleton list containing only the given Item.
@@ -57,15 +64,15 @@ func (buf *ListBuffer) Init() {
 // PROGRAMMER NOTE: It is correct to call buf.IsFull() prior to all calls to
 // buf.Singleton(), since it is not possible to switch upon the type of error
 // to identify whether the error has a recoverable cause.
-func (buf *ListBuffer) Singleton(item *Item) (BufferIndex, error) {
-	return -1, nil
+func (buf *ListBuffer) Singleton(item *Item) (BufferIndex, *error.Error) {
+	return NilIndex, nil
 }
 
 // Link connects the Items at indices prev and next so that prev comes before
 // next.
 //
 // Link returns an error if prev or next are not valid indices into buf. 
-func (buf *ListBuffer) Link(prev, next BufferIndex) error {
+func (buf *ListBuffer) Link(prev, next BufferIndex) *error.Error {
 	return nil
 }
 
@@ -75,7 +82,7 @@ func (buf *ListBuffer) Link(prev, next BufferIndex) error {
 // an uninitialized Item.
 //
 // PROGRAMMER NOTE: Unlink does not remove the memory imprint of the Item.
-func (buf *ListBuffer) Unlink(idx BufferIndex) error {
+func (buf *ListBuffer) Unlink(idx BufferIndex) *error.Error {
 	return nil
 }
 
@@ -83,7 +90,7 @@ func (buf *ListBuffer) Unlink(idx BufferIndex) error {
 //
 // An error is returned if idx is not a valid index into buf or if it represents
 // an uninitialized Item.
-func (buf *ListBuffer) Delete(idx BufferIndex) error {
+func (buf *ListBuffer) Delete(idx BufferIndex) *error.Error {
 	return nil
 }
 
@@ -96,8 +103,16 @@ func (buf *ListBuffer) IsFull() bool {
 //
 // An error is returned if idx is not a valid index into buf or if it represents
 // an uninitialized Item.
-func (buf *ListBuffer) Get(idx BufferIndex) (*Item, error) {
+func (buf *ListBuffer) Get(idx BufferIndex) (*Item, *error.Error) {
 	return nil, nil
 }
 
-func (buf *ListBuffer) 
+func (buf *ListBuffer) legalIndex(idx BufferIndex) (inRange, initialized bool) {
+	inRange = idx >= 0 && idx < BufferIndex(len(buf.Buffer))
+	if inRange {
+		initialized = buf.Buffer[idx].Item.Type != Uninitialized
+	} else {
+		initialized = true
+	}
+	return inRange, initialized
+}

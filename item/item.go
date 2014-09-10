@@ -1,4 +1,4 @@
-/* package item allows for the creation and storage of generic Items. 
+/*Package item allows for the creation and storage of generic Items. 
 
 Items are represented as a reference to a static collection of item behavior
 and a dynamic colleciton of instance-specific data.
@@ -8,15 +8,11 @@ of lists of Items, a ListBuffer, is also provided.
 */
 package item
 
-import (
-	"math"
-)
-
-// type Type represents all the data for an Item instance which cannot be
+// Type Type represents all the data for an Item instance which cannot be
 // changed at runtime.
 type Type uint32
 
-// type Item represents a single Item instance. Item.Type references the
+// Type Item represents a single Item instance. Item.Type references the
 // instance's static data and Item.Data references the instance's static data.
 //
 // If two Item instances cannot be transformed into one another at runtime,
@@ -24,7 +20,7 @@ type Type uint32
 // the Item.Type field.
 type Item struct {
 	Type Type
-	Data byte[8]
+	Data [8]byte
 }
 
 // Clear removes all data from item and marks it as being uninitialized.
