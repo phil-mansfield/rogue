@@ -71,21 +71,36 @@ func (buf *ListBuffer) Singleton(item *Item) (BufferIndex, *error.Error) {
 			"buf has reached maximum capacity of %d Items.",
 			MaxBufferCount,
 		)
-		return error.New(error.Value, desc)
+		return NilIndex, error.New(error.Value, desc)
 	} else if item == nil {
-		return error.New(error.Value, "item is nil.")
+		return NilIndex, error.New(error.Value, "item is nil.")
 	} else if item.Type == Uninitialized {
-		return error.New(error.Value, "item is uninitialized.")
+		return NilIndex, error.New(error.Value, "item is uninitialized.")
 	}
 
-	return NilIndex, nil
+	return buf.internalSingleton(item), nil
+}
+
+func (buf *ListBuffer) internalSingleton(item *Item) BufferIndex {
+	idx := buf.FreeHead
+	buf.Buffer[idx].Item = *item
+	buf.FreeHead = buf.Buffer[idx].Next
+
+	buf.internalUnlink(idx)
+	buf.Count += 1
+	
+	return idx
 }
 
 // Link connects the Items at indices prev and next so that prev comes before
 // next.
 //
-// Link returns an error if prev or next are not valid indices into buf. 
+// Link returns an error if prev or next are not valid indices into buf or if
+// the linking would break a pre-existing list. 
 func (buf *ListBuffer) Link(prev, next BufferIndex) *error.Error {
+	// If your functions don't have 50 lines of error handling for two lines
+	// of state altering-code, you aren't cautious enough.
+
 	inRange, initialized := buf.legalIndex(prev)
 	if !inRange {
 		desc := fmt.Sprintf(
@@ -95,8 +110,7 @@ func (buf *ListBuffer) Link(prev, next BufferIndex) *error.Error {
 		return error.New(error.Value, desc)
 	} else if !initialized {
 		desc := fmt.Sprintf(
-			"Item at prev, %d, has the Type value Uninitialized.",
-			prev,
+			"Item at prev, %d, has the Type value Uninitialized.", prev,
 		)
 		return error.New(error.Value, desc)
 	}
@@ -110,13 +124,34 @@ func (buf *ListBuffer) Link(prev, next BufferIndex) *error.Error {
 		return error.New(error.Value, desc)
 	} else if !initialized {
 		desc := fmt.Sprintf(
-			"Item at next, %d, has the Type value Uninitialized.",
-			next,
+			"Item at next, %d, has the Type value Uninitialized.", next,
 		)
 		return error.New(error.Value, desc)
 	}
 
+	if buf.Buffer[prev].Next != NilIndex {
+		desc := fmt.Sprintf(
+			"ItemNode at prev, %d, is already linked to Next ItemNode at %d.",
+			prev, buf.Buffer[prev].Next,
+		)
+		return error.New(error.Value, desc)
+	}
+
+	if buf.Buffer[next].Prev != NilIndex {
+		desc := fmt.Sprintf(
+			"ItemNode at next, %d, is already linked to Prev ItemNode at %d.",
+			next, buf.Buffer[next].Prev,
+		)
+		return error.New(error.Value, desc)
+	}
+
+	buf.internalLink(prev, next)
 	return nil
+}
+
+func (buf *ListBuffer) internalLink(prev, next BufferIndex) {
+	buf.Buffer[next].Prev = prev
+	buf.Buffer[prev].Next = next
 }
 
 // Unlink removes the Item at idx from its current list.
@@ -135,13 +170,24 @@ func (buf *ListBuffer) Unlink(idx BufferIndex) *error.Error {
 		return error.New(error.Value, desc)
 	} else if !initialized {
 		desc := fmt.Sprintf(
-			"Item at idx, %d, has the Type value Uninitialized.",
-			idx,
+			"Item at idx, %d, has the Type value Uninitialized.", idx,
 		)
 		return error.New(error.Value, desc)
 	}
 
+	buf.internalUnlink(idx)
 	return nil
+}
+
+func (buf *ListBuffer) internalUnlink(idx BufferIndex) {
+	next := buf.Buffer[idx].Next
+	prev := buf.Buffer[idx].Prev
+
+	if prev != NilIndex { buf.Buffer[prev].Next = next }
+	if next != NilIndex { buf.Buffer[next].Prev = prev }
+
+	buf.Buffer[idx].Next = NilIndex
+	buf.Buffer[idx].Prev = NilIndex
 }
 
 // Delete frees the buffer resources associated with the Item at idx.
@@ -158,11 +204,17 @@ func (buf *ListBuffer) Delete(idx BufferIndex) *error.Error {
 		return error.New(error.Value, desc)
 	} else if !initialized {
 		desc := fmt.Sprintf(
-			"Item at idx, %d, has the Type value Uninitialized.",
-			idx,
+			"Item at idx, %d, has the Type value Uninitialized.", idx,
 		)
 		return error.New(error.Value, desc)
 	}
+
+	if err := buf.Unlink(idx); err != nil { panic(err) }
+
+	if buf.FreeHead != NilIndex {
+		if err := buf.Link(idx, buf.FreeHead); err != nil { panic(err) }
+	}
+	buf.FreeHead = idx
 
 	return nil
 }
@@ -186,13 +238,12 @@ func (buf *ListBuffer) Get(idx BufferIndex) (*Item, *error.Error) {
 		return nil, error.New(error.Value, desc)
 	} else if !initialized {
 		desc := fmt.Sprintf(
-			"Item at idx, %d, has the Type value Uninitialized.",
-			idx,
+			"Item at idx, %d, has the Type value Uninitialized.", idx,
 		)
 		return nil, error.New(error.Value, desc)
 	}
 
-	return nil, nil
+	return &buf.Buffer[idx].Item, nil
 }
 
 // legalIndex determines the legality of accessing buf at idx. inRange is true
