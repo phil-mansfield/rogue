@@ -35,16 +35,16 @@ internally.
 
 Sanity errors indicate that something impossible has occured. This could mean
 that there was a non-exhaustive switch statement or that some data structure
-invariant was not upheld, or something similar. Sanity errors must be used in
-all places where adding functionality requires updating multiple parts of the
-code, but are otherwise up to the programmer's discretion.
+invariant was not upheld, or something similar. You are free to panic instead
+of reporting a sanity error at your discresion.
 
 Value errors indicate that a function has been given a parameter which is
 outside its valid value range. All of a package's externally visible
 functions must give value errors when encountering such a value. Internal
 package functions may return these errors at the programmer's discretion. If
 input is in the form of labeled integers (like ErrorCodes) and there is no
-other potentially erroneous input, value errors don't need to be returned.
+other potentially erroneous input, value errors don't need to be returned and
+you may panic instead.
 */
 package error
 
