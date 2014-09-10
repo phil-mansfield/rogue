@@ -1,4 +1,4 @@
-/*package error provides utilities for creating and reporting errors.
+/*Package error provides utilities for creating and reporting errors.
 
 Currently supported ErrorCodes are
 
@@ -36,7 +36,8 @@ internally.
 Sanity errors indicate that something impossible has occured. This could mean
 that there was a non-exhaustive switch statement or that some data structure
 invariant was not upheld, or something similar. You are free to panic instead
-of reporting a sanity error at your discresion.
+of reporting a sanity error at your discresion. All structs which fit the
+Checker interface report only Sanity errors.
 
 Value errors indicate that a function has been given a parameter which is
 outside its valid value range. All of a package's externally visible
@@ -53,7 +54,7 @@ import (
 	"runtime"
 )
 
-// type ErrorCode represents the
+// Type ErrorCode represents the error type of an Error instance.
 type ErrorCode uint8
 
 type Error struct {
@@ -91,7 +92,7 @@ func (code ErrorCode) String() string {
 	return fmt.Sprintf("Unrecognized Error Code %d", code)
 }
 
-// Error returns a string describing the given Error. It is not
+// Error returns a string describing the error. It is not
 // newline-terminaled.
 func (err *Error) Error() string {
 	if err == nil {
@@ -111,7 +112,7 @@ func (err *Error) VerboseError() string {
 	return fmt.Sprintf("%s\n\n%s", err.Stack, err.Error())
 }
 
-// New creates a new Error corresponding to an error of type code which is
+// New creates a new Error corresponding to type code which is
 // described by the string desc.
 func New(code ErrorCode, desc string) *Error {
 	err := &Error{code, desc, ""}
