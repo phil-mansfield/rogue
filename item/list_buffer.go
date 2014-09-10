@@ -1,6 +1,7 @@
 package item
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/phil-mansfield/rogue/error"
@@ -73,6 +74,36 @@ func (buf *ListBuffer) Singleton(item *Item) (BufferIndex, *error.Error) {
 //
 // Link returns an error if prev or next are not valid indices into buf. 
 func (buf *ListBuffer) Link(prev, next BufferIndex) *error.Error {
+	inRange, initialized := buf.legalIndex(prev)
+	if !inRange {
+		desc := fmt.Sprintf(
+			"prev, %d, is out of range for IndexBuffer of length %d.",
+			prev, len(buf.Buffer),
+		)
+		return error.New(error.Value, desc)
+	} else if !initialized {
+		desc := fmt.Sprintf(
+			"Item at prev, %d, has the Type value Uninitialized.",
+			prev,
+		)
+		return error.New(error.Value, desc)
+	}
+
+	inRange, initialized = buf.legalIndex(prev)
+	if !inRange {
+		desc := fmt.Sprintf(
+			"next, %d, is out of range for IndexBuffer of length %d.",
+			next, len(buf.Buffer),
+		)
+		return error.New(error.Value, desc)
+	} else if !initialized {
+		desc := fmt.Sprintf(
+			"Item at next, %d, has the Type value Uninitialized.",
+			next,
+		)
+		return error.New(error.Value, desc)
+	}
+
 	return nil
 }
 
@@ -83,6 +114,21 @@ func (buf *ListBuffer) Link(prev, next BufferIndex) *error.Error {
 //
 // PROGRAMMER NOTE: Unlink does not remove the memory imprint of the Item.
 func (buf *ListBuffer) Unlink(idx BufferIndex) *error.Error {
+	inRange, initialized := buf.legalIndex(idx)
+	if !inRange {
+		desc := fmt.Sprintf(
+			"idx, %d, is out of range for IndexBuffer of length %d.",
+			idx, len(buf.Buffer),
+		)
+		return error.New(error.Value, desc)
+	} else if !initialized {
+		desc := fmt.Sprintf(
+			"Item at idx, %d, has the Type value Uninitialized.",
+			idx,
+		)
+		return error.New(error.Value, desc)
+	}
+
 	return nil
 }
 
@@ -91,12 +137,27 @@ func (buf *ListBuffer) Unlink(idx BufferIndex) *error.Error {
 // An error is returned if idx is not a valid index into buf or if it represents
 // an uninitialized Item.
 func (buf *ListBuffer) Delete(idx BufferIndex) *error.Error {
+	inRange, initialized := buf.legalIndex(idx)
+	if !inRange {
+		desc := fmt.Sprintf(
+			"idx, %d, is out of range for IndexBuffer of length %d.",
+			idx, len(buf.Buffer),
+		)
+		return error.New(error.Value, desc)
+	} else if !initialized {
+		desc := fmt.Sprintf(
+			"Item at idx, %d, has the Type value Uninitialized.",
+			idx,
+		)
+		return error.New(error.Value, desc)
+	}
+
 	return nil
 }
 
 // IsFull returns true if no more items can be added to buf.
 func (buf *ListBuffer) IsFull() bool {
-	return true
+	return buf.Count >= MaxBufferCount
 }
 
 // Get returns the Item stored at idx within buf.
@@ -104,9 +165,25 @@ func (buf *ListBuffer) IsFull() bool {
 // An error is returned if idx is not a valid index into buf or if it represents
 // an uninitialized Item.
 func (buf *ListBuffer) Get(idx BufferIndex) (*Item, *error.Error) {
+	inRange, initialized := buf.legalIndex(idx)
+	if !inRange {
+		desc := fmt.Sprintf(
+			"idx, %d, is out of range for IndexBuffer of length %d.",
+			idx, len(buf.Buffer),
+		)
+		return nil, error.New(error.Value, desc)
+	} else if !initialized {
+		desc := fmt.Sprintf(
+			"Item at idx, %d, has the Type value Uninitialized.",
+			idx,
+		)
+		return nil, error.New(error.Value, desc)
+	}
+
 	return nil, nil
 }
 
+// legalIndex determines the legality of 
 func (buf *ListBuffer) legalIndex(idx BufferIndex) (inRange, initialized bool) {
 	inRange = idx >= 0 && idx < BufferIndex(len(buf.Buffer))
 	if inRange {
