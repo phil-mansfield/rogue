@@ -60,12 +60,24 @@ func (buf *ListBuffer) Init() {
 // Singleton creates a singleton list containing only the given Item.
 //
 // Singleton returns an error if it is passed a nil pointer, if it is passed
-// an uninitialized Item, or if the buf.Count is full.
+// an uninitialized Item, or if the buf is full.
 //
 // PROGRAMMER NOTE: It is correct to call buf.IsFull() prior to all calls to
 // buf.Singleton(), since it is not possible to switch upon the type of error
 // to identify whether the error has a recoverable cause.
 func (buf *ListBuffer) Singleton(item *Item) (BufferIndex, *error.Error) {
+	if buf.IsFull() {
+		desc := fmt.Sprintf(
+			"buf has reached maximum capacity of %d Items.",
+			MaxBufferCount,
+		)
+		return error.New(error.Value, desc)
+	} else if item == nil {
+		return error.New(error.Value, "item is nil.")
+	} else if item.Type == Uninitialized {
+		return error.New(error.Value, "item is uninitialized.")
+	}
+
 	return NilIndex, nil
 }
 
@@ -183,7 +195,9 @@ func (buf *ListBuffer) Get(idx BufferIndex) (*Item, *error.Error) {
 	return nil, nil
 }
 
-// legalIndex determines the legality of 
+// legalIndex determines the legality of accessing buf at idx. inRange is true
+// if the index is valid and initialized is true if there is an invalid item at
+// idx.
 func (buf *ListBuffer) legalIndex(idx BufferIndex) (inRange, initialized bool) {
 	inRange = idx >= 0 && idx < BufferIndex(len(buf.Buffer))
 	if inRange {
