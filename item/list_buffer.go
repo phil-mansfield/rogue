@@ -12,10 +12,13 @@ import (
 // Since BufferIndex may be changed to different size or to a type of unknown
 // signage, all BufferIndex literals must be constructed from 0, 1,
 // MaxBufferCount, and NilIndex alone.
-type BufferIndex int32
+type BufferIndex int16
+
+// Note that the usage of "Count" and "Length" in constant names *is* actually
+// consistent.
 
 const (
-	MaxBufferCount      = math.MaxInt32 // Largest possible value of ListBuffer.Count.
+	MaxBufferCount      = math.MaxInt16 // Largest possible value of ListBuffer.Count.
 	NilIndex            = -1            // Sentinel ListBuffer index value.
 	defaultBufferLength = 1 << 8        // The length of an empty ListBuffer.
 )
@@ -85,9 +88,10 @@ func (buf *ListBuffer) Singleton(item *Item) (BufferIndex, *error.Error) {
 }
 
 func (buf *ListBuffer) internalSingleton(item *Item) BufferIndex {
-	if buf.Count == len(buf.Buffer) {
-		buf.Buffer = append(buf.Buffer, *item)
-		return len(buf.Buffer) - 1
+	if buf.Count == BufferIndex(len(buf.Buffer)) {
+		buf.Buffer = append(buf.Buffer, Node{*item, NilIndex, NilIndex})
+		buf.Count++
+		return BufferIndex(len(buf.Buffer) - 1)
 	}
 
 	idx := buf.FreeHead
@@ -104,7 +108,8 @@ func (buf *ListBuffer) internalSingleton(item *Item) BufferIndex {
 // comes before the item at next.
 //
 // Link returns an error if prev or next are not valid indices into buf or if
-// the linking would break a pre-existing list.
+// the linking would break a pre-existing list or if one of the indices accesses
+// a .
 func (buf *ListBuffer) Link(prev, next BufferIndex) *error.Error {
 	// If your functions don't have 50 lines of error handling for two lines
 	// of state altering-code, you aren't cautious enough.
@@ -123,7 +128,7 @@ func (buf *ListBuffer) Link(prev, next BufferIndex) *error.Error {
 		return error.New(error.Value, desc)
 	}
 
-	inRange, initialized = buf.legalIndex(prev)
+	inRange, initialized = buf.legalIndex(next)
 	if !inRange {
 		desc := fmt.Sprintf(
 			"next, %d, is out of range for IndexBuffer of length %d.",
@@ -203,7 +208,7 @@ func (buf *ListBuffer) internalUnlink(idx BufferIndex) {
 // Delete frees the buffer resources associated with the item at the given
 // index.
 //
-// An error is returned if idx is not a valid index into buferf or if it
+// An error is returned if idx is not a valid index into buffer or if it
 // represents an uninitialized item.
 func (buf *ListBuffer) Delete(idx BufferIndex) *error.Error {
 	inRange, initialized := buf.legalIndex(idx)
@@ -225,10 +230,16 @@ func (buf *ListBuffer) Delete(idx BufferIndex) *error.Error {
 }
 
 func (buf *ListBuffer) internalDelete(idx BufferIndex) {
-	buf.internalUnlink()
+	buf.internalUnlink(idx)
 	if buf.FreeHead != NilIndex {
-		err := buf.internalLink(idx, buf.FreeHead)
-	}	
+		buf.internalLink(idx, buf.FreeHead)
+	}
+
+	node := &buf.Buffer[idx]
+	node.Item.Clear()
+	node.Next = buf.FreeHead
+	node.Prev = NilIndex
+
 	buf.FreeHead = idx
 
 	buf.Count--
@@ -272,4 +283,117 @@ func (buf *ListBuffer) legalIndex(idx BufferIndex) (inRange, initialized bool) {
 		initialized = true
 	}
 	return inRange, initialized
+}
+
+// Check performs various consistency checks on the buffer and returns an error
+// indicating which the first failed check. If all checks pass, nil is returned.
+func (buf *ListBuffer) Check() *error.Error {
+
+	// Check that the buffer isn't too long.
+	if len(buf.Buffer) > MaxBufferCount {
+		desc := fmt.Sprintf(
+			"Buffer length of %d is larger than max of %d.",
+			len(buf.Buffer), MaxBufferCount,
+		)
+		return error.New(error.Sanity, desc)
+	}
+
+	// Check that all items are valid.
+	for i := 0; i < len(buf.Buffer); i++ {
+		if err := buf.Buffer[i].Item.Check(); err != nil { return err }
+	}
+
+	// Check that the item count is correct.
+	count := 0
+	for i := 0; i < len(buf.Buffer); i++ {
+		if buf.Buffer[i].Item.Type != Uninitialized {
+			count += 1
+		}
+	}
+
+	if BufferIndex(count) != buf.Count {
+		desc := fmt.Sprintf(
+			"buf.Count = %d, but there are %d items in buffer.",
+			buf.Count, count,
+		)
+		return error.New(error.Sanity, desc)
+	}
+
+	// Check all Prev indices.
+	for i := 0; i < len(buf.Buffer); i++ {
+		prev := buf.Buffer[i].Prev
+		if prev != NilIndex && buf.Buffer[prev].Next != BufferIndex(i) {
+			desc := fmt.Sprintf(
+				"Prev index of item %d is %d, but Next index of item %d is %d.",
+				i, prev, prev, buf.Buffer[prev].Next,
+			)
+			return error.New(error.Sanity, desc)
+		}
+	}
+
+	// Check all Next indices.
+	for i := 0; i < len(buf.Buffer); i++ {
+		next := buf.Buffer[i].Next
+		if next != NilIndex && buf.Buffer[next].Prev != BufferIndex(i) {
+			desc := fmt.Sprintf(
+				"Next index of item %d is %d, but Prev index of item %d is %d.",
+				i, next, next, buf.Buffer[next].Prev,
+			)
+			return error.New(error.Sanity, desc)
+		}
+	}
+
+	// Check for cycles.
+	checkBuffer := make([]bool, len(buf.Buffer))
+	for i := 0; i < len(buf.Buffer); i++ {
+		if !checkBuffer[i] && buf.hasCycle(BufferIndex(i), checkBuffer) {
+			desc := fmt.Sprintf("List with head at index %d contains cycle.", i)
+			return error.New(error.Sanity, desc)
+		}
+	}
+
+	return nil
+}
+
+// hasCycle returns true if there is a cycle after in the list following the
+// given index and that cycle has not already been detected.
+func (buf *ListBuffer) hasCycle(idx BufferIndex, checkBuffer []bool) bool {
+//	if buf.Buffer[idx].Item.Type == Uninitialized {
+//		checkBuffer[idx] = true
+//		return false
+//	}
+
+	checkBuffer[idx] = true
+
+	tortise := idx
+	hare := idx
+
+	for hare != NilIndex {
+		hare = buf.Incr(buf.Incr(hare))
+		tortise = buf.Incr(tortise)
+
+		if hare != NilIndex { checkBuffer[hare] = true }
+		if tortise != NilIndex { checkBuffer[tortise] = true }
+
+		if hare == tortise && hare != NilIndex {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Incr returns the index of item which follows idx in the current list.
+func (buf *ListBuffer) Incr(idx BufferIndex) BufferIndex {
+	if idx == NilIndex {
+		return NilIndex
+	} 
+	return buf.Buffer[idx].Next
+}
+
+func (buf *ListBuffer) Decr(idx BufferIndex) BufferIndex {
+	if idx == NilIndex {
+		return NilIndex
+	}
+	return buf.Buffer[idx].Prev
 }
