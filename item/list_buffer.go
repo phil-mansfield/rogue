@@ -7,7 +7,7 @@ import (
 	"github.com/phil-mansfield/rogue/error"
 )
 
-// Type BufferIndex is an integer type used to index into ListBuffer.
+// BufferIndex is an integer type used to index into ListBuffer.
 //
 // Since BufferIndex may be changed to different size or to a type of unknown
 // signage, all BufferIndex literals must be constructed from 0, 1,
@@ -18,12 +18,16 @@ type BufferIndex int16
 // consistent.
 
 const (
-	MaxBufferCount      = math.MaxInt16 // Largest possible value of ListBuffer.Count.
-	NilIndex            = -1            // Sentinel ListBuffer index value.
-	defaultBufferLength = 1 << 8        // The length of an empty ListBuffer.
+	// MaxBufferCount is the largest possible value of ListBuffer.Count.
+	MaxBufferCount      = math.MaxInt16
+	// NilIndex is a sentinel ListBuffer index value. It is analogous to a a
+	// nil pointer.
+	NilIndex            = -1    
+	// defaultBufferLength is the length of an empty ListBuffer.        
+	defaultBufferLength = 1 << 8
 )
 
-// Type Node is a wrapper around the type Item which allows it to be an element
+// Node is a wrapper around the type Item which allows it to be an element
 // in a linked list.
 //
 // Next and Prev reference the indices of other Items within the same instance
@@ -33,7 +37,7 @@ type Node struct {
 	Next, Prev BufferIndex
 }
 
-// Type ListBuffer is a data structure which represents numerous lists of items.
+// ListBuffer is a data structure which represents numerous lists of items.
 type ListBuffer struct {
 	FreeHead BufferIndex
 	Buffer   []Node
@@ -65,21 +69,19 @@ func (buf *ListBuffer) Init() {
 
 // Singleton creates a singleton list containing only the given item.
 //
-// Singleton returns an error if it is passed a nil pointer, if it is passed
+// Singleton returns an error if it is passed
 // an uninitialized item, or if the buf is full.
 //
 // It is correct to call buf.IsFull() prior to all calls to
 // buf.Singleton(), since it is not possible to switch upon the type of error
 // to identify whether the error has a recoverable cause.
-func (buf *ListBuffer) Singleton(item *Item) (BufferIndex, *error.Error) {
+func (buf *ListBuffer) Singleton(item Item) (BufferIndex, *error.Error) {
 	if buf.IsFull() {
 		desc := fmt.Sprintf(
 			"buf has reached maximum capacity of %d Items.",
 			MaxBufferCount,
 		)
 		return NilIndex, error.New(error.Value, desc)
-	} else if item == nil {
-		return NilIndex, error.New(error.Value, "item is nil.")
 	} else if item.Type == Uninitialized {
 		return NilIndex, error.New(error.Value, "item is uninitialized.")
 	}
@@ -87,15 +89,15 @@ func (buf *ListBuffer) Singleton(item *Item) (BufferIndex, *error.Error) {
 	return buf.internalSingleton(item), nil
 }
 
-func (buf *ListBuffer) internalSingleton(item *Item) BufferIndex {
+func (buf *ListBuffer) internalSingleton(item Item) BufferIndex {
 	if buf.Count == BufferIndex(len(buf.Buffer)) {
-		buf.Buffer = append(buf.Buffer, Node{*item, NilIndex, NilIndex})
+		buf.Buffer = append(buf.Buffer, Node{item, NilIndex, NilIndex})
 		buf.Count++
 		return BufferIndex(len(buf.Buffer) - 1)
 	}
 
 	idx := buf.FreeHead
-	buf.Buffer[idx].Item = *item
+	buf.Buffer[idx].Item = item
 	buf.FreeHead = buf.Buffer[idx].Next
 
 	buf.internalUnlink(idx)
@@ -254,22 +256,45 @@ func (buf *ListBuffer) IsFull() bool {
 //
 // An error is returned if idx is not a valid index into the buffer or if it
 // represents an uninitialized item.
-func (buf *ListBuffer) Get(idx BufferIndex) (*Item, *error.Error) {
+func (buf *ListBuffer) Get(idx BufferIndex) (Item, *error.Error) {
 	inRange, initialized := buf.legalIndex(idx)
 	if !inRange {
 		desc := fmt.Sprintf(
 			"idx, %d, is out of range for IndexBuffer of length %d.",
 			idx, len(buf.Buffer),
 		)
-		return nil, error.New(error.Value, desc)
+		return Item{}, error.New(error.Value, desc)
 	} else if !initialized {
 		desc := fmt.Sprintf(
 			"Item at idx, %d, has the Type value Uninitialized.", idx,
 		)
-		return nil, error.New(error.Value, desc)
+		return Item{}, error.New(error.Value, desc)
 	}
 
-	return &buf.Buffer[idx].Item, nil
+	return buf.Buffer[idx].Item, nil
+}
+
+// Set updates the item stored at the given index within the buffer.
+//
+// An error is returned if idx is not a valid index into the buffer or if it
+// represents an uninitialized item.
+func (buf *ListBuffer) Set(idx BufferIndex, item Item) (*error.Error) {
+	inRange, initialized := buf.legalIndex(idx)
+	if !inRange {
+		desc := fmt.Sprintf(
+			"idx, %d, is out of range for IndexBuffer of length %d.",
+			idx, len(buf.Buffer),
+		)
+		return error.New(error.Value, desc)
+	} else if !initialized {
+		desc := fmt.Sprintf(
+			"Item at idx, %d, has the Type value Uninitialized.", idx,
+		)
+		return error.New(error.Value, desc)
+	}
+
+	buf.Buffer[idx].Item = item
+	return nil
 }
 
 // legalIndex determines the legality of accessing the buffer at idx. inRange
@@ -307,7 +332,7 @@ func (buf *ListBuffer) Check() *error.Error {
 	count := 0
 	for i := 0; i < len(buf.Buffer); i++ {
 		if buf.Buffer[i].Item.Type != Uninitialized {
-			count += 1
+			count++
 		}
 	}
 
@@ -358,11 +383,6 @@ func (buf *ListBuffer) Check() *error.Error {
 // hasCycle returns true if there is a cycle after in the list following the
 // given index and that cycle has not already been detected.
 func (buf *ListBuffer) hasCycle(idx BufferIndex, checkBuffer []bool) bool {
-//	if buf.Buffer[idx].Item.Type == Uninitialized {
-//		checkBuffer[idx] = true
-//		return false
-//	}
-
 	checkBuffer[idx] = true
 
 	tortise := idx

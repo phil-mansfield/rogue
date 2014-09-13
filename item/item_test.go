@@ -29,7 +29,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestSingleton(t *testing.T) {
-	// Valid  uses of ItemBuffer.Singleton():
+	// Valid usages
 
 	counts := []int{
 		1, 2, defaultBufferLength, 
@@ -37,7 +37,7 @@ func TestSingleton(t *testing.T) {
 		MaxBufferCount,
 	}
 
-	item := &Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
+	item := Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
 
 	for i, count := range counts {
 		buf := New()
@@ -60,26 +60,21 @@ func TestSingleton(t *testing.T) {
 
 		for j := 0; j < len(buf.Buffer); j++ {
 			bufItem := buf.Buffer[j].Item
-			if bufItem.Type != Uninitialized && *item != bufItem {
+			if bufItem.Type != Uninitialized && item != bufItem {
 				t.Errorf(
 					"Test %d: Expected Item %v at index %d, but got %v.",
-					i, *item, j, bufItem,
+					i, item, j, bufItem,
 				)
 				break
 			}
 		}
 	}
 
-	// Invalid uses of ItemBuffer.Singleton():
+	// Invalid usages
 
 	buf := New()
 
-	_, err := buf.Singleton(nil)
-	if err == nil {
-		t.Errorf("No error on nil input to ItemBuffer.Singleton().")
-	}
-
-	_, err = buf.Singleton(&Item{1, Uninitialized, [6]int8{1, 2, 3, 4, 5, 6}})
+	_, err := buf.Singleton(Item{1, Uninitialized, [6]int8{1, 2, 3, 4, 5, 6}})
 	if err == nil {
 		t.Errorf("No error on Uninitialized input to ItemBuffer.Singleton().")
 	}
@@ -87,7 +82,7 @@ func TestSingleton(t *testing.T) {
 	for i := 0; i < MaxBufferCount; i++ {
 		_, err := buf.Singleton(item)
 		if err != nil {
-			t.Errorf("After erroneous input: %s")
+			t.Errorf("After erroneous input: %s", err.Error())
 		}
 	}
 
@@ -100,7 +95,7 @@ func TestSingleton(t *testing.T) {
 func TestIsFull(t *testing.T) {
 	buf := New()
 
-	item := &Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
+	item := Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
 
 	for i := BufferIndex(0); i < MaxBufferCount; i++ {
 		if buf.IsFull() {
@@ -116,7 +111,7 @@ func TestIsFull(t *testing.T) {
 }
 
 func TestLink(t *testing.T) {
-	item := &Item{1, TestItem, [6]int8{1,2,3,4,5,6}}
+	item := Item{1, TestItem, [6]int8{1,2,3,4,5,6}}
 
 	// Valid usage
 
@@ -180,7 +175,7 @@ func TestLink(t *testing.T) {
 }
 
 func TestUnlink(t *testing.T) {
-	item := &Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
+	item := Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
 
 	// Valid usage
 
@@ -206,7 +201,7 @@ func TestUnlink(t *testing.T) {
 
 		err := buf.Unlink(nodes[test.unlink])
 		if err != nil {
-			t.Errorf("Test %d: %s", )
+			t.Errorf("Test %d: %s", i, err.Error())
 		}
 
 		fwdIndices := listIndices(buf, test.fwdStart, true)
@@ -273,7 +268,7 @@ func sliceEq(s1, s2 []BufferIndex) bool {
 
 func TestDelete(t *testing.T) {
 
-	item := &Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
+	item := Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
 
 	// Valid usages
 
@@ -352,7 +347,7 @@ func TestGet(t *testing.T) {
 
 	// Valid usages
 
-	item := &Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
+	item := Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
 
 	buf := New()
 
@@ -361,8 +356,8 @@ func TestGet(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("On valid Get() call: %s", err.Error())
-	} else if *item != *getItem {
-		t.Errorf("Get Item = %v, but Singleton Item = %v", *getItem, *item)
+	} else if item != getItem {
+		t.Errorf("Get Item = %v, but Singleton Item = %v", getItem, item)
 	}
 
 	// Invalid usages
@@ -378,7 +373,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestItemCheck(t *testing.T) {
-	item := &Item{1, typeLimit, [6]int8{0, 0, 0, 0, 0, 0}}
+	item := Item{1, typeLimit, [6]int8{0, 0, 0, 0, 0, 0}}
 
 	if err := item.Check(); err == nil {
 		t.Errorf("Invalid item type marked as valid.")
@@ -461,15 +456,16 @@ func BenchmarkSingletonMax(b *testing.B) {
 }
 
 func benchmarkSingleton(b *testing.B, count int) {
-	item := &Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
+	item := Item{1, TestItem, [6]int8{1, 2, 3, 4, 5, 6}}
 
+	buf := New()
 	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		buf := New()
-		b.StartTimer()
-
-		for j := 0; j < count; j++ {
-			buf.Singleton(item)
+		if i % count == 0 {
+			b.StopTimer()
+			buf.Init()
+			b.StartTimer()
 		}
+
+		buf.Singleton(item)
 	}
 }

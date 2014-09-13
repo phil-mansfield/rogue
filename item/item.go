@@ -14,11 +14,11 @@ import (
 	"github.com/phil-mansfield/rogue/error"
 )
 
-// Type Type represents all the data for an Item instance which cannot be
+// Type represents all the data for an Item instance which cannot be
 // changed at runtime.
 type Type uint32
 
-// Type Item represents a single instance of an item. Item.Type references the
+// Item represents a single instance of an item. Item.Type references the
 // instance's static data and Item.Data references the instance's static data.
 //
 // If two Item instances cannot be transformed into one another at runtime,
